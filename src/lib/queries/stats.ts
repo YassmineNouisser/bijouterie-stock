@@ -184,25 +184,40 @@ function texteDepuis(rel: unknown, cle: string): string | null {
   return null;
 }
 
+// Récupère TOUS les produits en paginant (Supabase plafonne à 1000 lignes/requête).
+async function tousLesProduits(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<ProduitStock[]> {
+  const PAGE = 1000;
+  const out: ProduitStock[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("products")
+      .select(
+        "reference, designation, poids_grammes, carat, quantite_stock, seuil_alerte, date_entree",
+      )
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const lot = (data ?? []) as ProduitStock[];
+    out.push(...lot);
+    if (lot.length < PAGE) break;
+  }
+  return out;
+}
+
 // --- Mode réel (Supabase) -------------------------------------------
 async function statsReel(): Promise<DashboardStats> {
   const supabase = await createClient();
 
-  const [{ data: produits }, { data: invoices }, { data: items }] =
-    await Promise.all([
-      supabase
-        .from("products")
-        .select(
-          "reference, designation, poids_grammes, carat, quantite_stock, seuil_alerte, date_entree",
-        ),
-      supabase
-        .from("invoices")
-        .select("numero, date, total, clients(nom)")
-        .order("date", { ascending: false }),
-      supabase.from("invoice_items").select("quantite, products(poids_grammes)"),
-    ]);
+  const [prods, { data: invoices }, { data: items }] = await Promise.all([
+    tousLesProduits(supabase),
+    supabase
+      .from("invoices")
+      .select("numero, date, total, clients(nom)")
+      .order("date", { ascending: false }),
+    supabase.from("invoice_items").select("quantite, products(poids_grammes)"),
+  ]);
 
-  const prods = (produits ?? []) as ProduitStock[];
   const facs = invoices ?? [];
 
   let grammesVendus = 0;
