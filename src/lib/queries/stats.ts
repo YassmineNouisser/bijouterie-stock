@@ -13,6 +13,13 @@ export type DashboardStats = {
   nbProduits: number;
   nbAlertes: number;
   nbRupture: number;
+  // Résumé du stock disponible par matière (or/argent) et par titre (18K/9K).
+  resumeStock: {
+    or: PosteStock;
+    argent: PosteStock;
+    k18: PosteStock;
+    k9: PosteStock;
+  };
   stockParCarat: { label: string; grammes: number }[];
   stockParType: { type: string; grammes: number; nb: number }[];
   entreesParMois: PointMois[];
@@ -38,12 +45,16 @@ export type DashboardStats = {
 type ProduitStock = {
   reference: string;
   designation: string;
+  matiere: string | null;
   poids_grammes: number | null;
   carat: number | null;
   quantite_stock: number;
   seuil_alerte: number;
   date_entree: string | null;
 };
+
+/** Un poste de stock : nombre de pièces + grammage total. */
+export type PosteStock = { nb: number; grammes: number };
 
 /** Les 6 derniers mois glissants : [{ key: "2026-01", label: "janv." }]. */
 function derniers6Mois(): { key: string; label: string }[] {
@@ -67,6 +78,33 @@ function metriquesStock(prods: ProduitStock[]) {
 
   const grammesStock = r3(enStock.reduce((s, p) => s + poids(p), 0));
   const nbPiecesStock = enStock.reduce((s, p) => s + p.quantite_stock, 0);
+
+  // Résumé par matière (or/argent) et par titre (18K/9K) — pièces + grammes.
+  const rs = {
+    or: { nb: 0, grammes: 0 },
+    argent: { nb: 0, grammes: 0 },
+    k18: { nb: 0, grammes: 0 },
+    k9: { nb: 0, grammes: 0 },
+  };
+  for (const p of enStock) {
+    const g = poids(p);
+    const cle = p.matiere === "argent" ? "argent" : "or";
+    rs[cle].nb += p.quantite_stock;
+    rs[cle].grammes += g;
+    if (p.carat === 18) {
+      rs.k18.nb += p.quantite_stock;
+      rs.k18.grammes += g;
+    } else if (p.carat === 9) {
+      rs.k9.nb += p.quantite_stock;
+      rs.k9.grammes += g;
+    }
+  }
+  const resumeStock = {
+    or: { nb: rs.or.nb, grammes: r3(rs.or.grammes) },
+    argent: { nb: rs.argent.nb, grammes: r3(rs.argent.grammes) },
+    k18: { nb: rs.k18.nb, grammes: r3(rs.k18.grammes) },
+    k9: { nb: rs.k9.nb, grammes: r3(rs.k9.grammes) },
+  };
 
   // Par carat (18K, 21K…)
   const parCarat = new Map<string, number>();
@@ -111,6 +149,7 @@ function metriquesStock(prods: ProduitStock[]) {
     grammesStock,
     nbPiecesStock,
     nbProduits: prods.length,
+    resumeStock,
     nbAlertes: prods.filter(
       (p) => statutStock(p.quantite_stock, p.seuil_alerte) === "alerte",
     ).length,
@@ -140,6 +179,7 @@ function statsDemo(): DashboardStats {
   const prods: ProduitStock[] = produitsDemo.map((p) => ({
     reference: p.reference,
     designation: p.designation,
+    matiere: p.matiere,
     poids_grammes: p.poids_grammes,
     carat: p.carat,
     quantite_stock: p.quantite_stock,
@@ -194,7 +234,7 @@ async function tousLesProduits(
     const { data, error } = await supabase
       .from("products")
       .select(
-        "reference, designation, poids_grammes, carat, quantite_stock, seuil_alerte, date_entree",
+        "reference, designation, matiere, poids_grammes, carat, quantite_stock, seuil_alerte, date_entree",
       )
       .range(from, from + PAGE - 1);
     if (error) throw error;

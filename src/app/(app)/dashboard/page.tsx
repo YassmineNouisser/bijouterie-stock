@@ -10,7 +10,7 @@ import {
   PackagePlus,
 } from "lucide-react";
 import { exigerProfil } from "@/lib/auth";
-import { getDashboardStats } from "@/lib/queries/stats";
+import { getDashboardStats, type PosteStock } from "@/lib/queries/stats";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import {
@@ -83,6 +83,38 @@ export default async function DashboardPage() {
           icone={TrendingUp}
         />
       </div>
+
+      {/* Résumé du stock disponible : Or / Argent / 18K / 9K (pièces + grammes) */}
+      <section className="carte p-6">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="font-titre text-xl font-semibold text-anthracite">
+            Stock disponible
+          </h2>
+          <span className="eyebrow">Pièces & grammes</span>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <ResumeStock
+            libelle="Or"
+            poste={stats.resumeStock.or}
+            pastille="bg-gradient-to-br from-[#e9d29a] to-[#c7a24b]"
+          />
+          <ResumeStock
+            libelle="Argent"
+            poste={stats.resumeStock.argent}
+            pastille="bg-gradient-to-br from-[#e9e9ee] to-[#b9bcc4]"
+          />
+          <ResumeStock
+            libelle="18K"
+            poste={stats.resumeStock.k18}
+            pastille="bg-gradient-to-br from-[#e9d29a] to-[#c7a24b]"
+          />
+          <ResumeStock
+            libelle="9K"
+            poste={stats.resumeStock.k9}
+            pastille="bg-gradient-to-br from-[#f0dfb0] to-[#c9a84f]"
+          />
+        </div>
+      </section>
 
       {/* Répartition du stock : par carat + par type */}
       <div className="grid gap-5 lg:grid-cols-3">
@@ -236,6 +268,35 @@ export default async function DashboardPage() {
           </ul>
         )}
       </section>
+    </div>
+  );
+}
+
+/** Carte résumé d'un poste de stock : pièces + grammage. */
+function ResumeStock({
+  libelle,
+  poste,
+  pastille,
+}: {
+  libelle: string;
+  poste: PosteStock;
+  pastille: string;
+}) {
+  return (
+    <div className="rounded-xl border border-or-clair/50 bg-white/70 p-4">
+      <div className="flex items-center gap-2">
+        <span className={`size-3 rounded-full ${pastille}`} />
+        <span className="text-sm font-medium text-anthracite">{libelle}</span>
+      </div>
+      <p className="mt-3 font-titre text-3xl font-semibold tracking-tight text-anthracite">
+        {poste.nb}
+        <span className="ml-1.5 text-sm font-normal text-anthracite/50">
+          pièce{poste.nb > 1 ? "s" : ""}
+        </span>
+      </p>
+      <p className="mt-1 text-sm tabular-nums text-or-fonce">
+        {grammes(poste.grammes)}
+      </p>
     </div>
   );
 }
