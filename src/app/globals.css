@@ -1,26 +1,218 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/*
+  Charte graphique — Bouzid Bijouterie by Youssef
+  Bijouterie de luxe : or champagne, anthracite, ivoire.
+  Valeurs de départ (ajustables quand les codes exacts du site seront fournis).
+  Tailwind v4 : le thème se déclare ici en CSS, plus de tailwind.config.ts.
+*/
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Couleurs de marque -> génèrent les utilitaires (bg-or, text-anthracite, ...) */
+  --color-or: #c7a24b; /* Or / champagne — accent principal */
+  --color-or-fonce: #a8863a; /* Or foncé — survol / contraste */
+  --color-or-clair: #e3cd8f; /* Or clair — bordures discrètes */
+  --color-anthracite: #111111; /* Texte, fonds sombres */
+  --color-anthracite-doux: #2a2a2a;
+  --color-ivoire: #faf7f0; /* Fond clair crème */
+  --color-creme: #f3ecdd; /* Cartes / surfaces */
+  --color-blanc: #ffffff;
+
+  /* Teintes du logo / facture */
+  --color-or-logo: #c0a052; /* Or du logo Bouzid */
+  --color-filigrane: #ece2cf; /* Filigrane clair (watermark facture) */
+  --color-or-soft: #f6efdd; /* Surface dorée très claire */
+  --color-anthracite-900: #0d0d0c; /* Fond sombre profond (sidebar) */
+
+  /* Polices (liées via next/font dans layout.tsx) */
+  --font-serif: var(--font-cormorant), Georgia, serif; /* Titres élégants */
+  --font-sans: var(--font-inter), system-ui, sans-serif; /* Corps de texte */
+  --font-script: var(--font-great-vibes), "Brush Script MT", cursive; /* « Youssef » */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: #faf7f0; /* ivoire */
+  --foreground: #111111; /* anthracite */
 }
 
 body {
-  background: var(--background);
+  /* Fond ivoire réchauffé par des halos dorés discrets + grain très léger */
+  background:
+    radial-gradient(
+      1200px 620px at 100% -8%,
+      rgba(199, 162, 75, 0.12),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 520px at -8% 108%,
+      rgba(199, 162, 75, 0.08),
+      transparent 55%
+    ),
+    var(--background);
+  background-attachment: fixed;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Titres en serif par défaut, légèrement resserrés pour un rendu couture */
+h1,
+h2,
+h3,
+.font-titre {
+  font-family: var(--font-serif);
+  letter-spacing: -0.012em;
+}
+
+/* Sélection dorée */
+::selection {
+  background: rgba(199, 162, 75, 0.24);
+  color: var(--color-anthracite);
+}
+
+/* Anneau de focus doré, discret et cohérent partout */
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid rgba(199, 162, 75, 0.55);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Composants de design réutilisables (look luxe)                     */
+/* ------------------------------------------------------------------ */
+@layer components {
+  /* Surface / carte premium : bord doré discret + ombre chaude douce +
+     fin liseré lumineux en haut (effet verre/nacre). */
+  .carte {
+    @apply relative rounded-2xl border border-or-clair/45 bg-white;
+    background-image: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.9),
+      rgba(250, 247, 240, 0.4)
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.7),
+      0 1px 2px rgba(17, 17, 17, 0.03),
+      0 22px 48px -28px rgba(150, 115, 40, 0.4);
+  }
+  .carte-survol {
+    @apply transition duration-300 ease-out;
+  }
+  .carte-survol:hover {
+    border-color: rgba(199, 162, 75, 0.5);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.8),
+      0 2px 6px rgba(17, 17, 17, 0.05),
+      0 30px 60px -26px rgba(150, 115, 40, 0.5);
+    transform: translateY(-3px);
+  }
+
+  /* Texte en or (dégradé champagne appliqué au glyphe) */
+  .text-dore {
+    background: linear-gradient(135deg, #e6cd8e 0%, #c7a24b 52%, #a8863a 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Sur-titre doré en petites capitales espacées, avec tiret décoratif */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-or;
+  }
+  .eyebrow::before {
+    content: "";
+    @apply h-px w-5 bg-or/60;
+  }
+
+  /* Filet doré dégradé */
+  .filet-or {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--color-or-clair),
+      transparent
+    );
+  }
+
+  /* Puce dorée (badges, onglets actifs) */
+  .chip-or {
+    background: linear-gradient(135deg, #f3e6bf 0%, #e3cd8f 100%);
+    @apply text-or-fonce;
+  }
+
+  /* Bouton doré (CTA principal) avec léger reflet au survol */
+  .btn-or {
+    @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full px-5 py-2.5 text-sm font-medium text-anthracite transition;
+    background: linear-gradient(135deg, #e9d29a 0%, #c7a24b 55%, #ad8c3c 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      0 8px 22px -10px rgba(150, 115, 40, 0.7);
+  }
+  .btn-or::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      120deg,
+      transparent 20%,
+      rgba(255, 255, 255, 0.5) 50%,
+      transparent 80%
+    );
+    transform: translateX(-120%);
+    transition: transform 0.6s ease;
+  }
+  .btn-or:hover::after {
+    transform: translateX(120%);
+  }
+  .btn-or:hover {
+    filter: brightness(1.05);
+  }
+  .btn-or:disabled {
+    @apply cursor-not-allowed opacity-50;
+    filter: none;
+  }
+  .btn-or:disabled::after {
+    display: none;
+  }
+
+  /* Bouton sombre (CTA secondaire) */
+  .btn-sombre {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-anthracite px-5 py-2.5 text-sm font-medium text-ivoire transition hover:bg-anthracite-doux;
+    box-shadow: 0 8px 22px -14px rgba(17, 17, 17, 0.8);
+  }
+}
+
+/*
+  Impression : on masque toute l'interface sauf la feuille de facture,
+  qui occupe alors la page entière (export PDF via le navigateur).
+*/
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .facture-sheet,
+  .facture-sheet * {
+    visibility: visible;
+  }
+  .facture-sheet {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    box-shadow: none;
+    border: none;
+  }
+  .sans-impression {
+    display: none !important;
+  }
+}
+
+/* Rendu fidèle des aplats de couleur (bandeau doré) à l'impression */
+.facture-sheet {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }

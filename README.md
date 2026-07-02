@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bouzid Bijouterie by Youssef — Application de gestion
 
-## Getting Started
+Application web de gestion pour une bijouterie de luxe (Tunisie) : produits,
+stock, ventes et facturation PDF conforme à la réglementation tunisienne.
+Interface en **français**, devise **Dinar Tunisien (DT)** à 3 décimales.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router) + **React 19** + **TypeScript**
+- **Tailwind CSS v4** (thème déclaré dans `src/app/globals.css`)
+- **Supabase** (PostgreSQL + Auth + Storage)
+- Déploiement **Vercel**
+
+> ⚠️ Next.js 16 introduit des changements : le `middleware.ts` devient
+> `src/proxy.ts` (fonction `proxy`), `cookies()` est asynchrone. Voir
+> `node_modules/next/dist/docs/` avant toute modification.
+
+## 1. Prérequis
+
+- Node.js 20+
+- Un projet [Supabase](https://supabase.com)
+
+## 2. Variables d'environnement
+
+Copier le modèle puis renseigner les valeurs :
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.local.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Variable | Description |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL du projet Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clé publique anon |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clé secrète — **serveur uniquement** |
+| `NEXT_PUBLIC_BIJOU_*` | Identité de la bijouterie (mentions légales) |
+| `NEXT_PUBLIC_TVA_DEFAUT` / `NEXT_PUBLIC_TIMBRE_FISCAL` | Paramètres de facturation |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+> Les infos de la bijouterie (matricule fiscal, TVA, timbre) sont stockées en
+> variables d'environnement — il n'y a pas de table `parametres`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 3. Base de données (migrations)
 
-## Learn More
+Dans le **SQL Editor** de Supabase, exécuter les fichiers de
+`supabase/migrations/` **dans l'ordre** :
 
-To learn more about Next.js, take a look at the following resources:
+1. `0001_schema.sql` — types, tables, trigger de création de profil
+2. `0002_rls.sql` — Row Level Security, policies, bucket Storage `produits`
+3. `0003_facture_sequence.sql` — séquence + fonction `creer_facture` (atomique)
+4. `0004_seed.sql` — catégories et produits de démonstration (optionnel)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Créer le premier administrateur
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Créer un compte via **Authentication > Users** (ou la page `/login` après
+   inscription). Un profil `vendeur` est créé automatiquement.
+2. Le passer admin dans le SQL Editor :
 
-## Deploy on Vercel
+```sql
+update profiles set role = 'admin'
+where id = (select id from auth.users where email = 'admin@exemple.tn');
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 4. Lancement local
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm install
+npm run dev
+```
+
+Ouvrir [http://localhost:3000](http://localhost:3000) → redirige vers `/login`.
+
+## 5. Déploiement Vercel
+
+1. Importer le dépôt dans Vercel.
+2. Renseigner les mêmes variables d'environnement (Project Settings >
+   Environment Variables).
+3. Déployer. Le build utilise `next build`.
+
+## Sécurité
+
+- **RLS activée sur toutes les tables.** Suppression réservée au rôle `admin`.
+- Le coût d'achat (`products.cout_achat`) est masqué aux vendeurs côté requêtes
+  serveur (admin et vendeur partagent le rôle Postgres `authenticated`).
+- La clé `service_role` n'est jamais exposée au navigateur (`import "server-only"`).
+- Le numéro de facture est généré par une **séquence Postgres** (`creer_facture`),
+  jamais côté client — obligation légale tunisienne.
+
+## État d'avancement
+
+- [x] Fondations (clients Supabase, proxy, charte graphique)
+- [x] Migrations SQL (schéma, RLS, séquence facture, seed)
+- [x] **Authentification & rôles** (login, protection, admin/vendeur)
+- [ ] Catalogue produits (CRUD)
+- [ ] Gestion de stock
+- [ ] Facturation PDF
+- [ ] Tableau de bord
+- [ ] PWA

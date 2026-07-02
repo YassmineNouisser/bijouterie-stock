@@ -36,6 +36,13 @@ yarn-error.log*
 # vercel
 .vercel
 
+# données source stock (Excel + photos) — non nécessaires au déploiement
+*.xlsx
+~$*.xlsx
+/stocks info/
+/stock info argent/
+/stock info argent /
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
