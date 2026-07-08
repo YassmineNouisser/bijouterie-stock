@@ -21,7 +21,8 @@ export type DashboardStats = {
     k9: PosteStock;
   };
   stockParCarat: { label: string; grammes: number }[];
-  stockParType: { type: string; grammes: number; nb: number }[];
+  stockParTypeOr: { type: string; grammes: number; nb: number }[];
+  stockParTypeArgent: { type: string; grammes: number; nb: number }[];
   entreesParMois: PointMois[];
   dernieresEntrees: {
     reference: string;
@@ -113,16 +114,30 @@ function metriquesStock(prods: ProduitStock[]) {
     parCarat.set(key, (parCarat.get(key) ?? 0) + poids(p));
   }
 
-  // Par type (premier mot de la désignation : bague, collier, فردة…)
-  const parType = new Map<string, { grammes: number; nb: number }>();
-  for (const p of enStock) {
-    const key = (p.designation.trim().split(/\s+/)[0] || "Autre").toLowerCase();
-    const cur = parType.get(key) ?? { grammes: 0, nb: 0 };
-    parType.set(key, {
-      grammes: cur.grammes + poids(p),
-      nb: cur.nb + p.quantite_stock,
-    });
+  // Par type (premier mot de la désignation : bague, collier, فردة…),
+  // séparé Or / Argent.
+  function ventilationParType(items: ProduitStock[]) {
+    const m = new Map<string, { grammes: number; nb: number }>();
+    for (const p of items) {
+      const key =
+        (p.designation.trim().split(/\s+/)[0] || "Autre").toLowerCase();
+      const cur = m.get(key) ?? { grammes: 0, nb: 0 };
+      m.set(key, {
+        grammes: cur.grammes + poids(p),
+        nb: cur.nb + p.quantite_stock,
+      });
+    }
+    return [...m.entries()]
+      .map(([type, v]) => ({ type, grammes: r3(v.grammes), nb: v.nb }))
+      .sort((a, b) => b.grammes - a.grammes)
+      .slice(0, 8);
   }
+  const stockParTypeOr = ventilationParType(
+    enStock.filter((p) => p.matiere !== "argent"),
+  );
+  const stockParTypeArgent = ventilationParType(
+    enStock.filter((p) => p.matiere === "argent"),
+  );
 
   // Entrées de stock par mois (grammes)
   const mois = derniers6Mois();
@@ -157,10 +172,8 @@ function metriquesStock(prods: ProduitStock[]) {
     stockParCarat: [...parCarat.entries()]
       .map(([label, grammes]) => ({ label, grammes: r3(grammes) }))
       .sort((a, b) => b.grammes - a.grammes),
-    stockParType: [...parType.entries()]
-      .map(([type, v]) => ({ type, grammes: r3(v.grammes), nb: v.nb }))
-      .sort((a, b) => b.grammes - a.grammes)
-      .slice(0, 8),
+    stockParTypeOr,
+    stockParTypeArgent,
     entreesParMois: mois.map((m) => ({
       mois: m.label,
       ca: 0,

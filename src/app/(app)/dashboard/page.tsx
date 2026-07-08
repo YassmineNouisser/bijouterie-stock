@@ -29,7 +29,6 @@ export default async function DashboardPage() {
     getDashboardStats(),
   ]);
 
-  const maxType = Math.max(1, ...stats.stockParType.map((t) => t.grammes));
   const alertesTotal = stats.nbAlertes + stats.nbRupture;
 
   return (
@@ -141,35 +140,20 @@ export default async function DashboardPage() {
             </h2>
             <span className="eyebrow">Poids disponible</span>
           </div>
-          {stats.stockParType.length === 0 ? (
-            <p className="py-8 text-center text-sm text-anthracite/50">
-              Aucune pièce en stock.
-            </p>
-          ) : (
-            <ul className="space-y-3.5">
-              {stats.stockParType.map((t) => (
-                <li key={t.type} className="space-y-1.5">
-                  <div className="flex items-baseline justify-between gap-3 text-sm">
-                    <span className="font-medium capitalize text-anthracite">
-                      {t.type}
-                    </span>
-                    <span className="shrink-0 tabular-nums text-anthracite/70">
-                      {grammes(t.grammes)}
-                      <span className="ml-2 text-xs text-anthracite/40">
-                        {t.nb} pc
-                      </span>
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-or-soft">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-or-clair to-or"
-                      style={{ width: `${(t.grammes / maxType) * 100}%` }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+            <VentilationType
+              titre="Or"
+              pastille="bg-gradient-to-br from-[#e9d29a] to-[#c7a24b]"
+              barre="from-or-clair to-or"
+              data={stats.stockParTypeOr}
+            />
+            <VentilationType
+              titre="Argent"
+              pastille="bg-gradient-to-br from-[#e9e9ee] to-[#b9bcc4]"
+              barre="from-[#d9dbe0] to-[#a9adb6]"
+              data={stats.stockParTypeArgent}
+            />
+          </div>
         </section>
       </div>
 
@@ -268,6 +252,60 @@ export default async function DashboardPage() {
           </ul>
         )}
       </section>
+    </div>
+  );
+}
+
+/** Ventilation par type d'un métal (Or ou Argent), avec barres de poids. */
+function VentilationType({
+  titre,
+  pastille,
+  barre,
+  data,
+}: {
+  titre: string;
+  pastille: string;
+  barre: string;
+  data: { type: string; grammes: number; nb: number }[];
+}) {
+  const max = Math.max(1, ...data.map((t) => t.grammes));
+  return (
+    <div>
+      <div className="mb-3 flex items-center gap-2">
+        <span className={`size-3 rounded-full ${pastille}`} />
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-anthracite/70">
+          {titre}
+        </h3>
+      </div>
+      {data.length === 0 ? (
+        <p className="py-6 text-center text-sm text-anthracite/40">
+          Aucune pièce en stock.
+        </p>
+      ) : (
+        <ul className="space-y-3">
+          {data.map((t) => (
+            <li key={t.type} className="space-y-1.5">
+              <div className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="font-medium capitalize text-anthracite">
+                  {t.type}
+                </span>
+                <span className="shrink-0 tabular-nums text-anthracite/70">
+                  {grammes(t.grammes)}
+                  <span className="ml-2 text-xs text-anthracite/40">
+                    {t.nb} pc
+                  </span>
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-or-soft">
+                <div
+                  className={`h-full rounded-full bg-gradient-to-r ${barre}`}
+                  style={{ width: `${(t.grammes / max) * 100}%` }}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
