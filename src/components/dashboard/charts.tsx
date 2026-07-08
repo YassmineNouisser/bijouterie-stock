@@ -1,176 +1,104 @@
-"use client";
-
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from "recharts";
 import type { PointMois } from "@/lib/queries/stats";
-import { formatDinar } from "@/lib/format";
 
-const OR = "#c7a24b";
-const OR_FONCE = "#a8863a";
-const PALETTE = ["#c7a24b", "#d8bd7e", "#a8863a", "#e3cd8f", "#8a6a2f", "#b89a5a"];
+/*
+  Graphiques légers en CSS/SVG (aucune dépendance JS type recharts).
+  Rendus côté serveur → zéro JavaScript envoyé au navigateur : essentiel
+  pour la fluidité sur mobile.
+*/
 
-const axe = { fontSize: 12, fill: "#9a8a6a" };
-
-const tooltipStyle = {
-  borderRadius: 12,
-  border: "1px solid #e3cd8f",
-  background: "#fffdf8",
-  boxShadow: "0 10px 30px -12px rgba(150,115,40,0.4)",
-  fontSize: 13,
-};
+const PALETTE = [
+  "#c7a24b",
+  "#d8bd7e",
+  "#a8863a",
+  "#e3cd8f",
+  "#8a6a2f",
+  "#b89a5a",
+];
 
 function grammes(v: number) {
   return `${v.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} g`;
 }
 
-/** Aire : chiffre d'affaires par mois. */
-export function ChartCAMensuel({ data }: { data: PointMois[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={260}>
-      <AreaChart data={data} margin={{ top: 10, right: 8, left: -8, bottom: 0 }}>
-        <defs>
-          <linearGradient id="grad-ca" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={OR} stopOpacity={0.35} />
-            <stop offset="100%" stopColor={OR} stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#efe6d2" vertical={false} />
-        <XAxis dataKey="mois" tick={axe} axisLine={false} tickLine={false} />
-        <YAxis
-          tick={axe}
-          axisLine={false}
-          tickLine={false}
-          width={48}
-          tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
-        />
-        <Tooltip
-          contentStyle={tooltipStyle}
-          formatter={(v) => [formatDinar(Number(v)), "Chiffre d'affaires"]}
-        />
-        <Area
-          type="monotone"
-          dataKey="ca"
-          stroke={OR_FONCE}
-          strokeWidth={2.5}
-          fill="url(#grad-ca)"
-          dot={{ r: 3, fill: OR_FONCE, strokeWidth: 0 }}
-          activeDot={{ r: 5 }}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
-  );
-}
-
-/** Barres : grammes d'or vendus par mois. */
+/** Barres verticales : grammes par mois (entrées de stock). */
 export function ChartGrammesMensuel({ data }: { data: PointMois[] }) {
+  const max = Math.max(1, ...data.map((d) => d.grammes));
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <BarChart data={data} margin={{ top: 10, right: 8, left: -8, bottom: 0 }}>
-        <defs>
-          <linearGradient id="grad-gram" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#e3cd8f" />
-            <stop offset="100%" stopColor={OR} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#efe6d2" vertical={false} />
-        <XAxis dataKey="mois" tick={axe} axisLine={false} tickLine={false} />
-        <YAxis tick={axe} axisLine={false} tickLine={false} width={40} />
-        <Tooltip
-          cursor={{ fill: "rgba(199,162,75,0.08)" }}
-          contentStyle={tooltipStyle}
-          formatter={(v) => [grammes(Number(v)), "Or vendu"]}
-        />
-        <Bar dataKey="grammes" fill="url(#grad-gram)" radius={[6, 6, 0, 0]} maxBarSize={42} />
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="flex h-[220px] items-end justify-between gap-2 pt-2">
+      {data.map((d) => (
+        <div
+          key={d.mois}
+          className="flex flex-1 flex-col items-center justify-end gap-2"
+        >
+          <span className="text-[0.65rem] tabular-nums text-anthracite/50">
+            {d.grammes > 0
+              ? Math.round(d.grammes).toLocaleString("fr-FR")
+              : ""}
+          </span>
+          <div className="flex w-full justify-center">
+            <div
+              className="w-8 rounded-t-md bg-gradient-to-t from-or to-or-clair"
+              style={{
+                height: `${Math.max(2, (d.grammes / max) * 170)}px`,
+              }}
+            />
+          </div>
+          <span className="text-xs capitalize text-anthracite/60">
+            {d.mois}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 
-/** Anneau : répartition du stock (en grammes) — ex. par carat. */
+/** Anneau (donut) en conic-gradient + légende — répartition par carat. */
 export function ChartDonutGrammes({
   data,
 }: {
   data: { label: string; grammes: number }[];
 }) {
-  return (
-    <ResponsiveContainer width="100%" height={260}>
-      <PieChart>
-        <Pie
-          data={data}
-          dataKey="grammes"
-          nameKey="label"
-          innerRadius={55}
-          outerRadius={85}
-          paddingAngle={2}
-          stroke="none"
-        >
-          {data.map((_, i) => (
-            <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
-          ))}
-        </Pie>
-        <Tooltip
-          contentStyle={tooltipStyle}
-          formatter={(v, n) => [grammes(Number(v)), String(n)]}
-        />
-        <Legend
-          iconType="circle"
-          iconSize={9}
-          formatter={(value: string) => (
-            <span style={{ color: "#4a4438", fontSize: 12 }}>{value}</span>
-          )}
-        />
-      </PieChart>
-    </ResponsiveContainer>
-  );
-}
+  const total = data.reduce((s, d) => s + d.grammes, 0) || 1;
+  let acc = 0;
+  const stops = data
+    .map((d, i) => {
+      const start = (acc / total) * 360;
+      acc += d.grammes;
+      const end = (acc / total) * 360;
+      return `${PALETTE[i % PALETTE.length]} ${start}deg ${end}deg`;
+    })
+    .join(", ");
 
-/** Anneau : répartition des ventes par catégorie. */
-export function ChartCategories({
-  data,
-}: {
-  data: { categorie: string; montant: number }[];
-}) {
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <PieChart>
-        <Pie
-          data={data}
-          dataKey="montant"
-          nameKey="categorie"
-          innerRadius={55}
-          outerRadius={85}
-          paddingAngle={2}
-          stroke="none"
-        >
-          {data.map((_, i) => (
-            <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
-          ))}
-        </Pie>
-        <Tooltip
-          contentStyle={tooltipStyle}
-          formatter={(v, n) => [formatDinar(Number(v)), String(n)]}
-        />
-        <Legend
-          iconType="circle"
-          iconSize={9}
-          formatter={(value: string) => (
-            <span style={{ color: "#4a4438", fontSize: 12 }}>{value}</span>
-          )}
-        />
-      </PieChart>
-    </ResponsiveContainer>
+    <div className="flex flex-col items-center gap-5 sm:flex-row sm:justify-center">
+      {/* Anneau */}
+      <div
+        className="relative size-40 shrink-0 rounded-full"
+        style={{ background: `conic-gradient(${stops})` }}
+      >
+        <div className="absolute inset-[22%] flex flex-col items-center justify-center rounded-full bg-white text-center">
+          <span className="font-titre text-lg font-semibold text-anthracite">
+            {grammes(total)}
+          </span>
+          <span className="text-[0.65rem] uppercase tracking-wide text-anthracite/40">
+            total
+          </span>
+        </div>
+      </div>
+      {/* Légende */}
+      <ul className="space-y-2">
+        {data.map((d, i) => (
+          <li key={d.label} className="flex items-center gap-2.5 text-sm">
+            <span
+              className="size-3 shrink-0 rounded-full"
+              style={{ background: PALETTE[i % PALETTE.length] }}
+            />
+            <span className="font-medium text-anthracite">{d.label}</span>
+            <span className="tabular-nums text-anthracite/60">
+              {grammes(d.grammes)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
