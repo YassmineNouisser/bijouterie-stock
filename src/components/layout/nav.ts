@@ -3,7 +3,7 @@ import {
   Gem,
   Boxes,
   FileText,
-  Users,
+  PackageCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -19,5 +19,5 @@ export const liensNav: LienNav[] = [
   { href: "/produits", libelle: "Produits", icone: Gem },
   { href: "/stock", libelle: "Stock", icone: Boxes },
   { href: "/factures", libelle: "Factures", icone: FileText },
-  { href: "/clients", libelle: "Clients", icone: Users },
+  { href: "/vendus", libelle: "Articles vendus", icone: PackageCheck },
 ];
