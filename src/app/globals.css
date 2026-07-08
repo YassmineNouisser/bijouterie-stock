@@ -48,7 +48,7 @@ body {
       transparent 55%
     ),
     var(--background);
-  background-attachment: fixed;
+  /* Pas de `background-attachment: fixed` : cause un scroll saccadé sur mobile. */
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;

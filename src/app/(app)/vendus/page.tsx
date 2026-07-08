@@ -1,26 +1,40 @@
-import { getProduits } from "@/lib/queries/produits";
+import { getProduitsPage, PAR_PAGE } from "@/lib/queries/produits";
 import { exigerProfil } from "@/lib/auth";
 import { ProduitsListe } from "@/components/produits/produits-liste";
 import { PageHeader } from "@/components/ui/page-header";
 
-export default async function VendusPage() {
-  const [profil, produits] = await Promise.all([
-    exigerProfil(),
-    getProduits(),
-  ]);
-
-  // Articles vendus = sortis du stock (quantité 0).
-  const vendus = produits.filter((p) => p.quantite_stock <= 0);
+export default async function VendusPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ matiere?: string; q?: string; page?: string }>;
+}) {
+  const [profil, sp] = await Promise.all([exigerProfil(), searchParams]);
+  const page = Number(sp.page) || 1;
+  const data = await getProduitsPage("vendus", {
+    matiere: sp.matiere,
+    q: sp.q,
+    page,
+  });
+  const total = data.comptes.or + data.comptes.argent;
 
   return (
     <div className="space-y-7">
       <PageHeader
         eyebrow="Historique"
         titre="Articles vendus"
-        sousTitre={`${vendus.length} article${vendus.length > 1 ? "s" : ""} vendu${vendus.length > 1 ? "s" : ""}`}
+        sousTitre={`${total} article${total > 1 ? "s" : ""} vendu${total > 1 ? "s" : ""}`}
       />
 
-      <ProduitsListe produits={vendus} estAdmin={profil.role === "admin"} />
+      <ProduitsListe
+        rows={data.rows}
+        comptes={data.comptes}
+        total={data.total}
+        matiere={sp.matiere === "argent" ? "argent" : "or"}
+        q={sp.q ?? ""}
+        page={page}
+        parPage={PAR_PAGE}
+        estAdmin={profil.role === "admin"}
+      />
     </div>
   );
 }

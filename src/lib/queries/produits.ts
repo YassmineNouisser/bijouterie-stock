@@ -98,6 +98,137 @@ export async function getProduits(): Promise<Produit[]> {
   return chargerProduits();
 }
 
+// ---------------------------------------------------------------------
+//  Liste PAGINÉE côté serveur (mobile : on n'envoie que ~12 lignes/page)
+// ---------------------------------------------------------------------
+export type ModeListe = "tous" | "stock" | "vendus";
+export type Matiere = "or" | "argent";
+export const PAR_PAGE = 12;
+
+export type PageProduits = {
+  rows: Produit[];
+  total: number; // nombre de résultats pour la matière courante
+  comptes: { or: number; argent: number };
+};
+
+/** Nettoie la recherche pour l'injecter sans casser la syntaxe PostgREST. */
+function nettoyerRecherche(q: string): string {
+  return q.replace(/[,()*%]/g, " ").trim();
+}
+
+const chargerPage = unstable_cache(
+  async (
+    mode: ModeListe,
+    matiere: Matiere,
+    q: string,
+    page: number,
+  ): Promise<PageProduits> => {
+    const supabase = createAdminClient();
+    const rechercheOr = q
+      ? (`reference.ilike.%${q}%,designation.ilike.%${q}%` as const)
+      : null;
+
+    // Compte les pièces d'une matière (avec le filtre stock du mode + recherche).
+    const compter = (mat: Matiere) => {
+      let x = supabase
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .eq("matiere", mat);
+      if (mode === "stock") x = x.gt("quantite_stock", 0);
+      else if (mode === "vendus") x = x.lte("quantite_stock", 0);
+      if (rechercheOr) x = x.or(rechercheOr);
+      return x;
+    };
+
+    // Filtres (matière, stock, recherche) AVANT le tri/la pagination.
+    let lignes = supabase
+      .from("products")
+      .select(PRODUIT_SELECT)
+      .eq("matiere", matiere);
+    if (mode === "stock") lignes = lignes.gt("quantite_stock", 0);
+    else if (mode === "vendus") lignes = lignes.lte("quantite_stock", 0);
+    if (rechercheOr) lignes = lignes.or(rechercheOr);
+
+    const from = (page - 1) * PAR_PAGE;
+    const lignesTriees = lignes
+      .order("date_entree", { ascending: false, nullsFirst: false })
+      .range(from, from + PAR_PAGE - 1);
+
+    const [resOr, resArgent, resRows] = await Promise.all([
+      compter("or"),
+      compter("argent"),
+      lignesTriees,
+    ]);
+
+    const rows: Produit[] = (resRows.data ?? []).map((p) => ({
+      id: p.id,
+      reference: p.reference,
+      designation: p.designation,
+      categorie: nomCategorie(p.categories),
+      matiere: p.matiere,
+      carat: p.carat,
+      poids_grammes: p.poids_grammes,
+      pierres: p.pierres,
+      prix_vente: p.prix_vente,
+      cout_achat: p.cout_achat,
+      quantite_stock: p.quantite_stock,
+      seuil_alerte: p.seuil_alerte,
+      image_url: p.image_url,
+      date_entree: p.date_entree,
+      actif: p.actif,
+    }));
+
+    return {
+      rows,
+      total: matiere === "argent" ? resArgent.count ?? 0 : resOr.count ?? 0,
+      comptes: { or: resOr.count ?? 0, argent: resArgent.count ?? 0 },
+    };
+  },
+  ["produits-page"],
+  { tags: ["produits"], revalidate: 60 },
+);
+
+/** Une page de produits filtrée (mobile-friendly). */
+export async function getProduitsPage(
+  mode: ModeListe,
+  opts: { matiere?: string; q?: string; page?: number },
+): Promise<PageProduits> {
+  const matiere: Matiere = opts.matiere === "argent" ? "argent" : "or";
+  const q = nettoyerRecherche(opts.q ?? "");
+  const page = Math.max(1, opts.page ?? 1);
+
+  if (DEMO) {
+    const tous = produitsDemo.map((p) => ({
+      ...p,
+      categorie: p.categorie,
+      date_entree: null,
+    })) as Produit[];
+    const dansMode = (p: Produit) =>
+      mode === "stock"
+        ? p.quantite_stock > 0
+        : mode === "vendus"
+          ? p.quantite_stock <= 0
+          : true;
+    const match = (p: Produit) =>
+      !q ||
+      p.reference.toLowerCase().includes(q.toLowerCase()) ||
+      p.designation.toLowerCase().includes(q.toLowerCase());
+    const base = tous.filter((p) => dansMode(p) && match(p));
+    const mat = (p: Produit) => (p.matiere === "argent" ? "argent" : "or");
+    const filtres = base.filter((p) => mat(p) === matiere);
+    return {
+      rows: filtres.slice((page - 1) * PAR_PAGE, page * PAR_PAGE),
+      total: filtres.length,
+      comptes: {
+        or: base.filter((p) => mat(p) === "or").length,
+        argent: base.filter((p) => mat(p) === "argent").length,
+      },
+    };
+  }
+
+  return chargerPage(mode, matiere, q, page);
+}
+
 /** Un produit par son id (pour l'édition). Renvoie null si introuvable. */
 export async function getProduit(id: string): Promise<Produit | null> {
   if (DEMO) {
