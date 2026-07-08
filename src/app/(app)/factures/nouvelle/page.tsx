@@ -4,13 +4,23 @@ import { getProduits } from "@/lib/queries/produits";
 import { getClients } from "@/lib/queries/clients";
 import { FactureForm } from "@/components/factures/facture-form";
 
-export default async function NouvelleFacturePage() {
-  const [produits, clients] = await Promise.all([getProduits(), getClients()]);
+// Next.js 16 : `searchParams` est asynchrone.
+export default async function NouvelleFacturePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ produit?: string }>;
+}) {
+  const [{ produit: produitInitialId }, produits, clients] = await Promise.all([
+    searchParams,
+    getProduits(),
+    getClients(),
+  ]);
 
   // Date du jour (calculée côté serveur pour éviter tout décalage d'hydratation).
   const dateDuJour = new Date().toISOString().slice(0, 10);
 
-  // Seuls les produits actifs et en stock sont proposés à la vente.
+  // Produits actifs proposés à la vente (y compris ceux déjà marqués vendus,
+  // pour pouvoir établir la facture d'un article sorti du stock).
   const options = produits
     .filter((p) => p.actif)
     .map((p) => ({
@@ -19,6 +29,12 @@ export default async function NouvelleFacturePage() {
       designation: p.designation,
       stock: p.quantite_stock,
     }));
+
+  // Produit pré-sélectionné (venant du pop-up « Vendu »), s'il existe.
+  const produitInitial =
+    produitInitialId && options.some((o) => o.id === produitInitialId)
+      ? produitInitialId
+      : undefined;
 
   return (
     <div className="space-y-6">
@@ -42,6 +58,7 @@ export default async function NouvelleFacturePage() {
         produits={options}
         clients={clients}
         dateDuJour={dateDuJour}
+        produitInitialId={produitInitial}
       />
     </div>
   );

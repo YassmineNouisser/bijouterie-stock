@@ -3,9 +3,20 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Pencil, Plus, Gem, QrCode, Trash2 } from "lucide-react";
+import {
+  Search,
+  Pencil,
+  Plus,
+  Gem,
+  QrCode,
+  Trash2,
+  ShoppingBag,
+  RotateCcw,
+  FileText,
+  X,
+} from "lucide-react";
 import type { Produit } from "@/lib/queries/produits";
-import { supprimerProduit } from "@/lib/actions/produits";
+import { supprimerProduit, basculerVendu } from "@/lib/actions/produits";
 import { statutStock, badgeStatut } from "@/lib/stock";
 import { formatGrammes, formatDate } from "@/lib/format";
 
@@ -50,6 +61,13 @@ export function ProduitsListe({
 
   const router = useRouter();
   const [suppression, demarrerSuppression] = useTransition();
+  const [vente, demarrerVente] = useTransition();
+  // Produit qu'on vient de marquer vendu → pop-up « aller à la facture ».
+  const [venduPopup, setVenduPopup] = useState<{
+    id: string;
+    designation: string;
+    reference: string;
+  } | null>(null);
 
   function supprimer(p: Produit) {
     if (
@@ -62,6 +80,28 @@ export function ProduitsListe({
       const res = await supprimerProduit(p.id);
       if (res.ok) router.refresh();
       else window.alert(res.erreur ?? "Suppression impossible.");
+    });
+  }
+
+  function marquerVendu(p: Produit) {
+    demarrerVente(async () => {
+      const res = await basculerVendu(p.id, true);
+      if (res.ok) {
+        setVenduPopup({
+          id: p.id,
+          designation: p.designation,
+          reference: p.reference,
+        });
+        router.refresh();
+      } else window.alert(res.erreur ?? "Opération impossible.");
+    });
+  }
+
+  function remettreEnStock(p: Produit) {
+    demarrerVente(async () => {
+      const res = await basculerVendu(p.id, false);
+      if (res.ok) router.refresh();
+      else window.alert(res.erreur ?? "Opération impossible.");
     });
   }
 
@@ -201,7 +241,29 @@ export function ProduitsListe({
                     </span>
                   </td>
                   <td className="px-6 py-5">
-                    <div className="flex items-center justify-end gap-1 opacity-70 transition duration-200 group-hover:opacity-100">
+                    <div className="flex items-center justify-end gap-1 opacity-80 transition duration-200 group-hover:opacity-100">
+                      {p.quantite_stock > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => marquerVendu(p)}
+                          disabled={vente}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-anthracite px-3 py-1.5 text-xs font-medium text-ivoire transition hover:bg-anthracite-doux disabled:opacity-50"
+                        >
+                          <ShoppingBag className="size-3.5" />
+                          Vendu
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => remettreEnStock(p)}
+                          disabled={vente}
+                          title="Remettre en stock"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-or-clair px-3 py-1.5 text-xs font-medium text-anthracite/60 transition hover:border-or hover:text-or disabled:opacity-50"
+                        >
+                          <RotateCcw className="size-3.5" />
+                          Remettre
+                        </button>
+                      )}
                       <Link
                         href={`/produits/${p.id}/etiquette`}
                         title="Étiquette / QR"
@@ -245,37 +307,58 @@ export function ProduitsListe({
           const statut = statutStock(p.quantite_stock, p.seuil_alerte);
           const badge = badgeStatut[statut];
           return (
-            <Link
-              key={p.id}
-              href={`/produits/${p.id}`}
-              className="flex gap-3.5 carte carte-survol p-4"
-            >
-              <Vignette url={p.image_url} taille="size-14" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="truncate font-medium text-anthracite">
-                    {p.designation}
+            <div key={p.id} className="carte carte-survol p-4">
+              <Link href={`/produits/${p.id}`} className="flex gap-3.5">
+                <Vignette url={p.image_url} taille="size-14" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="truncate font-medium text-anthracite">
+                      {p.designation}
+                    </p>
+                    <span
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.classe}`}
+                    >
+                      <span className="size-1.5 rounded-full bg-current opacity-70" />
+                      {badge.libelle}
+                    </span>
+                  </div>
+                  <p className="font-mono text-xs text-anthracite/50">
+                    {p.reference}
                   </p>
-                  <span
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.classe}`}
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-xs text-anthracite/50 tabular-nums">
+                      {poidsAffiche(p)}
+                    </span>
+                    <span className="text-xs text-anthracite/50">
+                      Stock : {p.quantite_stock}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+              <div className="mt-3 flex justify-end border-t border-or-clair/30 pt-3">
+                {p.quantite_stock > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => marquerVendu(p)}
+                    disabled={vente}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-anthracite px-4 py-1.5 text-xs font-medium text-ivoire transition hover:bg-anthracite-doux disabled:opacity-50"
                   >
-                    <span className="size-1.5 rounded-full bg-current opacity-70" />
-                    {badge.libelle}
-                  </span>
-                </div>
-                <p className="font-mono text-xs text-anthracite/50">
-                  {p.reference}
-                </p>
-                <div className="mt-1 flex items-center justify-between">
-                  <span className="text-xs text-anthracite/50 tabular-nums">
-                    {poidsAffiche(p)}
-                  </span>
-                  <span className="text-xs text-anthracite/50">
-                    Stock : {p.quantite_stock}
-                  </span>
-                </div>
+                    <ShoppingBag className="size-3.5" />
+                    Vendu
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => remettreEnStock(p)}
+                    disabled={vente}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-or-clair px-4 py-1.5 text-xs font-medium text-anthracite/60 transition hover:border-or hover:text-or disabled:opacity-50"
+                  >
+                    <RotateCcw className="size-3.5" />
+                    Remettre en stock
+                  </button>
+                )}
               </div>
-            </Link>
+            </div>
           );
         })}
       </div>
@@ -313,6 +396,59 @@ export function ProduitsListe({
           >
             Suivant
           </button>
+        </div>
+      )}
+
+      {/* Pop-up après « Vendu » : proposer d'aller à la facture pré-remplie */}
+      {venduPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-anthracite/50 backdrop-blur-sm"
+            onClick={() => setVenduPopup(null)}
+          />
+          <div className="relative w-full max-w-sm carte p-6 text-center">
+            <button
+              type="button"
+              onClick={() => setVenduPopup(null)}
+              aria-label="Fermer"
+              className="absolute right-3 top-3 rounded-full p-1.5 text-anthracite/40 transition hover:bg-ivoire hover:text-anthracite"
+            >
+              <X className="size-4" />
+            </button>
+            <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200">
+              <ShoppingBag className="size-5" />
+            </span>
+            <h3 className="mt-4 font-titre text-lg font-semibold text-anthracite">
+              Produit marqué vendu
+            </h3>
+            <p className="mt-1 text-sm text-anthracite/60">
+              «&nbsp;{venduPopup.designation}&nbsp;» ({venduPopup.reference}) est
+              sorti du stock. Veux-tu établir la facture&nbsp;?
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const cible = `/factures/nouvelle?produit=${encodeURIComponent(
+                    venduPopup.id,
+                  )}`;
+                  setVenduPopup(null);
+                  router.push(cible);
+                }}
+                className="btn-or w-full"
+              >
+                <FileText className="size-4" />
+                Aller à la facture
+              </button>
+              <button
+                type="button"
+                onClick={() => setVenduPopup(null)}
+                className="w-full rounded-full px-5 py-2.5 text-sm text-anthracite/60 transition hover:text-anthracite"
+              >
+                Plus tard
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

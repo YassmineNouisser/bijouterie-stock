@@ -25,6 +25,29 @@ export async function supprimerProduit(
   return { ok: true };
 }
 
+/**
+ * Marque un produit comme vendu (stock → 0) ou le remet en stock (→ 1).
+ * Vente rapide, réversible. La facture reste optionnelle et ne re-décompte pas.
+ */
+export async function basculerVendu(
+  id: string,
+  vendu: boolean,
+): Promise<{ ok: boolean; erreur?: string }> {
+  if (DEMO) return { ok: true };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("products")
+    .update({ quantite_stock: vendu ? 0 : 1 })
+    .eq("id", id);
+  if (error) return { ok: false, erreur: error.message };
+
+  revalidatePath("/produits");
+  revalidatePath("/stock");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
 function lireFormulaire(formData: FormData) {
   const nombre = (v: FormDataEntryValue | null) =>
     v === null || v === "" ? null : Number(v);

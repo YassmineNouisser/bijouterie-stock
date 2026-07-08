@@ -34,10 +34,12 @@ export function FactureForm({
   produits,
   clients,
   dateDuJour,
+  produitInitialId,
 }: {
   produits: ProduitOption[];
   clients: ClientOption[];
   dateDuJour: string;
+  produitInitialId?: string;
 }) {
   const router = useRouter();
   const produitsMap = useMemo(
@@ -45,7 +47,12 @@ export function FactureForm({
     [produits],
   );
 
-  const [lignes, setLignes] = useState<LigneEtat[]>([]);
+  // Ligne pré-remplie si on arrive depuis le pop-up « Vendu ».
+  const [lignes, setLignes] = useState<LigneEtat[]>(
+    produitInitialId && produitsMap[produitInitialId]
+      ? [{ productId: produitInitialId, quantite: 1, prix: "" }]
+      : [],
+  );
   const [clientMode, setClientMode] = useState<"existant" | "nouveau">(
     clients.length ? "existant" : "nouveau",
   );
