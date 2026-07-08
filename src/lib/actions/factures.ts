@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { DEMO } from "@/lib/demo";
 
@@ -83,6 +83,8 @@ export async function creerFactureAction(
     return { ok: false, erreur: error.message };
   }
 
+  updateTag("produits");
+  updateTag("factures");
   revalidatePath("/factures");
   revalidatePath("/produits");
   const res = data as { id: string; numero: string };

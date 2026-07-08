@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DEMO } from "@/lib/demo";
@@ -21,6 +21,7 @@ export async function supprimerProduit(
   if (error) {
     return { ok: false, erreur: error.message };
   }
+  updateTag("produits");
   revalidatePath("/produits");
   return { ok: true };
 }
@@ -42,6 +43,7 @@ export async function basculerVendu(
     .eq("id", id);
   if (error) return { ok: false, erreur: error.message };
 
+  updateTag("produits");
   revalidatePath("/produits");
   revalidatePath("/stock");
   revalidatePath("/dashboard");
@@ -130,6 +132,7 @@ export async function enregistrerProduit(
     return { erreur: "Enregistrement impossible : " + error.message };
   }
 
+  updateTag("produits");
   revalidatePath("/produits");
   redirect("/produits");
 }

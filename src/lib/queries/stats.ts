@@ -1,5 +1,6 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { DEMO, produitsDemo, facturesDemo } from "@/lib/demo";
 import { calculerTotaux } from "@/lib/facture";
 import { statutStock } from "@/lib/stock";
@@ -239,7 +240,7 @@ function texteDepuis(rel: unknown, cle: string): string | null {
 
 // Récupère TOUS les produits en paginant (Supabase plafonne à 1000 lignes/requête).
 async function tousLesProduits(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createAdminClient>,
 ): Promise<ProduitStock[]> {
   const PAGE = 1000;
   const out: ProduitStock[] = [];
@@ -258,9 +259,12 @@ async function tousLesProduits(
   return out;
 }
 
-// --- Mode réel (Supabase) -------------------------------------------
-async function statsReel(): Promise<DashboardStats> {
-  const supabase = await createClient();
+// --- Mode réel (Supabase), MIS EN CACHE ------------------------------
+// Données identiques pour tous ; recalcul uniquement après un changement
+// (tags "produits"/"factures" invalidés par les Server Actions).
+const statsReel = unstable_cache(
+  async (): Promise<DashboardStats> => {
+  const supabase = createAdminClient();
 
   const [prods, { data: invoices }, { data: items }] = await Promise.all([
     tousLesProduits(supabase),
@@ -296,4 +300,7 @@ async function statsReel(): Promise<DashboardStats> {
       total: f.total,
     })),
   };
-}
+  },
+  ["dashboard-stats"],
+  { tags: ["produits", "factures"], revalidate: 60 },
+);

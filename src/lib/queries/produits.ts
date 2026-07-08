@@ -1,5 +1,7 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { DEMO, produitsDemo } from "@/lib/demo";
 
 /** Forme normalisée d'un produit pour l'interface. */
@@ -31,8 +33,59 @@ const PRODUIT_SELECT =
   "id, reference, designation, matiere, carat, poids_grammes, pierres, prix_vente, cout_achat, quantite_stock, seuil_alerte, image_url, date_entree, actif, categories(nom)";
 
 /**
+ * Chargement réel des produits, MIS EN CACHE (données identiques pour tous les
+ * utilisateurs). Utilise le client service_role (sans cookies) pour tourner
+ * hors du contexte de requête. Le cache est invalidé via le tag "produits"
+ * à chaque ajout / modification / suppression / vente / facture.
+ */
+const chargerProduits = unstable_cache(
+  async (): Promise<Produit[]> => {
+    const supabase = createAdminClient();
+    // Supabase plafonne une requête à 1000 lignes : on pagine pour tout récupérer.
+    const PAGE = 1000;
+    const produits: Produit[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("products")
+        .select(PRODUIT_SELECT)
+        .order("date_entree", { ascending: false, nullsFirst: false })
+        .range(from, from + PAGE - 1);
+
+      if (error) throw error;
+      const lot = data ?? [];
+
+      for (const p of lot) {
+        produits.push({
+          id: p.id,
+          reference: p.reference,
+          designation: p.designation,
+          categorie: nomCategorie(p.categories),
+          matiere: p.matiere,
+          carat: p.carat,
+          poids_grammes: p.poids_grammes,
+          pierres: p.pierres,
+          prix_vente: p.prix_vente,
+          cout_achat: p.cout_achat,
+          quantite_stock: p.quantite_stock,
+          seuil_alerte: p.seuil_alerte,
+          image_url: p.image_url,
+          date_entree: p.date_entree,
+          actif: p.actif,
+        });
+      }
+
+      if (lot.length < PAGE) break;
+    }
+
+    return produits;
+  },
+  ["produits-liste"],
+  { tags: ["produits"], revalidate: 60 },
+);
+
+/**
  * Liste des produits.
- * En mode démo : données fictives. Sinon : Supabase (avec jointure catégorie).
+ * En mode démo : données fictives. Sinon : Supabase (via cache).
  */
 export async function getProduits(): Promise<Produit[]> {
   if (DEMO) {
@@ -42,46 +95,7 @@ export async function getProduits(): Promise<Produit[]> {
       date_entree: null,
     }));
   }
-
-  const supabase = await createClient();
-
-  // Supabase plafonne une requête à 1000 lignes : on pagine pour tout récupérer.
-  const PAGE = 1000;
-  const produits: Produit[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
-      .from("products")
-      .select(PRODUIT_SELECT)
-      .order("date_entree", { ascending: false, nullsFirst: false })
-      .range(from, from + PAGE - 1);
-
-    if (error) throw error;
-    const lot = data ?? [];
-
-    for (const p of lot) {
-      produits.push({
-        id: p.id,
-        reference: p.reference,
-        designation: p.designation,
-        categorie: nomCategorie(p.categories),
-        matiere: p.matiere,
-        carat: p.carat,
-        poids_grammes: p.poids_grammes,
-        pierres: p.pierres,
-        prix_vente: p.prix_vente,
-        cout_achat: p.cout_achat,
-        quantite_stock: p.quantite_stock,
-        seuil_alerte: p.seuil_alerte,
-        image_url: p.image_url,
-        date_entree: p.date_entree,
-        actif: p.actif,
-      });
-    }
-
-    if (lot.length < PAGE) break;
-  }
-
-  return produits;
+  return chargerProduits();
 }
 
 /** Un produit par son id (pour l'édition). Renvoie null si introuvable. */
